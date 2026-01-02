@@ -1,8 +1,19 @@
+"""Pixel packing utilities for common RAW bit depths."""
+
 import numpy as np
 import math
 
 
 def pack_raw_safe(data: np.ndarray, bit_depth: int) -> np.ndarray:
+    """Pack a 2D uint16 RAW array into a byte-aligned packed format.
+
+    Args:
+        data: Input array with shape `(height, width)`.
+        bit_depth: Bit depth per pixel (supported: 10, 12, 14).
+
+    Returns:
+        Packed bytes as a `uint8` NumPy array with shape `(height, packed_width)`.
+    """
     h, w = data.shape
 
     if bit_depth == 10:
@@ -35,6 +46,14 @@ def pack_raw_safe(data: np.ndarray, bit_depth: int) -> np.ndarray:
 
 
 def pack10(data: np.ndarray) -> np.ndarray:
+    """Pack 10-bit pixels into 5 bytes per 4 pixels.
+
+    Args:
+        data: Input array with shape `(height, width)`.
+
+    Returns:
+        Packed bytes as a `uint8` NumPy array.
+    """
     out = np.zeros((data.shape[0], int(data.shape[1] * (1.25))), dtype=np.uint8)
     out[:, ::5] = data[:, ::4] >> 2
     out[:, 1::5] = (data[:, ::4] & 0b0000000000000011) << 6
@@ -48,6 +67,14 @@ def pack10(data: np.ndarray) -> np.ndarray:
 
 
 def pack12(data: np.ndarray) -> np.ndarray:
+    """Pack 12-bit pixels into 3 bytes per 2 pixels.
+
+    Args:
+        data: Input array with shape `(height, width)`.
+
+    Returns:
+        Packed bytes as a `uint8` NumPy array.
+    """
     out = np.zeros((data.shape[0], int(data.shape[1] * (1.5))), dtype=np.uint8)
     out[:, ::3] = data[:, ::2] >> 4
     out[:, 1::3] = (data[:, ::2] & 0b0000000000001111) << 4
@@ -57,6 +84,14 @@ def pack12(data: np.ndarray) -> np.ndarray:
 
 
 def pack14(data: np.ndarray) -> np.ndarray:
+    """Pack 14-bit pixels into 7 bytes per 4 pixels.
+
+    Args:
+        data: Input array with shape `(height, width)`.
+
+    Returns:
+        Packed bytes as a `uint8` NumPy array.
+    """
     out = np.zeros((data.shape[0], int(data.shape[1] * (1.75))), dtype=np.uint8)
     out[:, ::7] = data[:, ::4] >> 6
     out[:, 1::7] = (data[:, ::4] & 0b0000000000111111) << 2

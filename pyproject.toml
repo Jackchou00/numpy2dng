@@ -14,6 +14,7 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "pydocstyle>=6.3.0",
     "pytest>=9.0.2",
     "rawpy>=0.25.1",
     "ruff>=0.14.10",

@@ -1,3 +1,5 @@
+"""Core conversion helpers for writing NumPy arrays to DNG."""
+
 import os
 import numpy as np
 import types
@@ -8,18 +10,37 @@ from .packing import pack_raw_safe
 
 
 class DNGBASE:
+    """Base converter for writing NumPy RAW frames into a DNG container."""
+
     def __init__(self) -> None:
+        """Initialize the converter with no options configured."""
         self.path = None
         self.tags = None
         self.filter = None
 
     def __data_condition__(self, data: np.ndarray) -> None:
+        """Validate that the input frame uses a supported dtype.
+
+        Args:
+            data: Input image as a NumPy array.
+
+        Returns:
+            None
+        """
         if data.dtype != np.uint16 and data.dtype != np.float32:
             raise Exception(
                 "RAW Data is not in correct format. Must be uint16_t or float32_t Numpy Array. "
             )
 
     def __tags_condition__(self, tags: DNGTags) -> None:
+        """Validate that required DNG tags are present.
+
+        Args:
+            tags: DNG tag container to validate.
+
+        Returns:
+            None
+        """
         if not tags.get(Tag.ImageWidth):
             raise Exception("No width is defined in tags.")
         if not tags.get(Tag.ImageLength):
@@ -28,11 +49,28 @@ class DNGBASE:
             raise Exception("Bit per pixel is not defined.")
 
     def __unpack_pixels__(self, data: np.ndarray) -> np.ndarray:
+        """Transform pixel layout before filtering/packing, if needed.
+
+        Args:
+            data: Input image as a NumPy array.
+
+        Returns:
+            Unpacked pixel array.
+        """
         return data
 
     def __filter__(
         self, rawFrame: np.ndarray, filter: types.FunctionType
     ) -> np.ndarray:
+        """Apply an optional user filter to a RAW frame.
+
+        Args:
+            rawFrame: Input frame as a NumPy array.
+            filter: Callable that accepts and returns a NumPy array, or `None`.
+
+        Returns:
+            The filtered frame as a NumPy array.
+        """
         if not filter:
             return rawFrame
 
@@ -49,6 +87,17 @@ class DNGBASE:
     def __process__(
         self, rawFrame: np.ndarray, tags: DNGTags, file: BinaryIO = None
     ) -> bytearray:
+        """Pack pixels and assemble a DNG byte buffer (and optionally write it).
+
+        Args:
+            rawFrame: Frame data with shape `(height, width, ...)`.
+            tags: DNG tag container describing image geometry and encoding.
+            file: Optional writable binary file-like object to stream output into.
+
+        Returns:
+            DNG file contents as a bytearray when `file` is not provided; otherwise a
+            bytearray containing the header/tag buffer.
+        """
         width = tags.get(Tag.ImageWidth).rawValue[0]
         length = tags.get(Tag.ImageLength).rawValue[0]
         bpp = tags.get(Tag.BitsPerSample).rawValue[0]
@@ -135,11 +184,31 @@ class DNGBASE:
         return buf
 
     def options(self, tags: DNGTags, path: str) -> None:
+        """Configure output options for subsequent conversions.
+
+        Args:
+            tags: DNG tag container used for generated files.
+            path: Output directory used when `convert` writes to disk.
+
+        Returns:
+            None
+        """
         self.__tags_condition__(tags)
         self.tags = tags
         self.path = path
 
     def convert(self, image: np.ndarray, filename="", file: BinaryIO = None):
+        """Convert a NumPy image into a DNG file or in-memory buffer.
+
+        Args:
+            image: Input image as a NumPy array.
+            filename: Output filename (without or with `.dng`) when writing to disk.
+            file: Optional open binary file handle (or `io.BytesIO`) to stream output.
+
+        Returns:
+            If `file` is provided, returns `None`. If `filename` is provided, returns
+            the output file path. Otherwise returns the DNG bytes.
+        """
         # The file parameter can be passed an open file handle, or a BytesIO,
         # and this function will take an optimised route to writing the output.
         # Note that the pixel data is not copied to self.buf (which is why it's
@@ -175,16 +244,44 @@ class DNGBASE:
 
 
 class RAW2DNG(DNGBASE):
+    """Converter for writing raw NumPy frames into DNG."""
+
     def __init__(self) -> None:
+        """Initialize the converter.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         super().__init__()
 
 
 class CAM2DNG(DNGBASE):
+    """Converter that sources its tags from a camera model object."""
+
     def __init__(self, model) -> None:
+        """Initialize the converter with a camera model.
+
+        Args:
+            model: Camera model object exposing a `tags` attribute.
+
+        Returns:
+            None
+        """
         super().__init__()
         self.model = model
 
     def options(self, path: str) -> None:
+        """Configure output directory using tags from the configured model.
+
+        Args:
+            path: Output directory used when `convert` writes to disk.
+
+        Returns:
+            None
+        """
         self.__tags_condition__(self.model.tags)
         self.tags = self.model.tags
         self.path = path

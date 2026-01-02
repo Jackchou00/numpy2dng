@@ -1,15 +1,21 @@
+"""DNG-related constants and enums used by the library."""
+
 # Read more about tags and their definitions/values here:
 # https://exiftool.org/TagNames/EXIF.html
 # https://www.adobe.com/content/dam/acom/en/products/photoshop/pdfs/dng_spec_1.4.0.0.pdf
 
 
 class Compression:
+    """DNG/TIFF compression scheme constants."""
+
     Uncompressed = 1
     LJ92 = 7  # Lossless JPEG
     Lossy_JPEG = 34892
 
 
 class PreviewColorSpace:
+    """DNG preview color space constants."""
+
     Unknown = 0
     Gray_Gamma_22 = 1
     sRGB = 2
@@ -18,6 +24,8 @@ class PreviewColorSpace:
 
 
 class Orientation:
+    """Image orientation constants."""
+
     Horizontal = 1
     MirrorH = 2
     Rotate180 = 3
@@ -25,6 +33,8 @@ class Orientation:
 
 
 class DNGVersion:
+    """DNG version tuple constants."""
+
     V1_0 = [1, 0, 0, 0]
     V1_1 = [1, 1, 0, 0]
     V1_2 = [1, 2, 0, 0]
@@ -35,6 +45,8 @@ class DNGVersion:
 
 
 class PhotometricInterpretation:
+    """Photometric interpretation constants."""
+
     WhiteIsZero = 0
     BlackIsZero = 1
     RGB = 2
@@ -43,6 +55,8 @@ class PhotometricInterpretation:
 
 
 class CFAPattern:
+    """Common Bayer CFA pattern constants."""
+
     BGGR = [2, 1, 1, 0]
     GBRG = [1, 2, 0, 1]
     GRBG = [1, 0, 2, 1]
@@ -50,6 +64,8 @@ class CFAPattern:
 
 
 class CalibrationIlluminant:
+    """Calibration illuminant constants used by DNG metadata."""
+
     Unknown = 0
     Daylight = 1
     Fluorescent = 2
@@ -76,6 +92,8 @@ class CalibrationIlluminant:
 
 # DMG 1.4 allows only Uint and FloatingPoint
 class SampleFormat:
+    """DNG sample format constants."""
+
     Uint = 1
     Int = 2
     FloatingPoint = 3

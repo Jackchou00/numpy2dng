@@ -1,8 +1,12 @@
+"""Minimal DNG/TIFF writer primitives used by the converter."""
+
 import struct
 from typing import BinaryIO
 
 
 class Type:
+    """TIFF data type constants used by DNG tags."""
+
     # TIFF Type Format = (Tag TYPE value, Size in bytes of one instance)
     Invalid = (0, 0)  # Should not be used
     Byte = (1, 1)  # 8-bit unsigned
@@ -21,6 +25,8 @@ class Type:
 
 
 class Tag:
+    """DNG/TIFF tag ID and type pairs."""
+
     Invalid = (0, Type.Invalid)
     NewSubfileType = (254, Type.Long)
     ImageWidth = (256, Type.Long)
@@ -151,35 +157,107 @@ class Tag:
 
 
 class DNGTags:
+    """Convenience container for building a list of `dngTag` instances."""
+
     def __init__(self):
+        """Create an empty tag collection.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         self.__tags__ = dict()
 
     def set(self, tag: Tag, value):
+        """Set a tag value, converting it into a `dngTag`.
+
+        Args:
+            tag: Tag identifier from `Tag`.
+            value: Tag value as an `int` or an already-encoded value sequence/string.
+
+        Returns:
+            None
+        """
         if isinstance(value, int):
             self.__tags__[tag] = dngTag(tag, [value])
         else:
             self.__tags__[tag] = dngTag(tag, value)
 
     def get(self, tag):
+        """Get a previously set tag.
+
+        Args:
+            tag: Tag identifier from `Tag`.
+
+        Returns:
+            The corresponding `dngTag` instance, or `None` if not present.
+        """
         try:
             return self.__tags__[tag]
         except KeyError:
             return None
 
     def list(self):
+        """List all stored tags as `dngTag` objects.
+
+        Args:
+            None
+
+        Returns:
+            A list of `dngTag` instances.
+        """
         return list(self.__tags__.values())
 
 
 class dngHeader(object):
+    """Minimal TIFF/DNG header helper."""
+
     def __init__(self):
+        """Initialize the header with the default first-IFD offset.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         self.IFDOffset = 8
 
     def raw(self):
+        """Encode the header bytes.
+
+        Args:
+            None
+
+        Returns:
+            The binary header as `bytes`.
+        """
         return struct.pack("<sI", "II\x2a\x00", self.IFDOffset)
 
 
 class dngTag(object):
+    """A single TIFF/DNG tag entry, including optional out-of-line value storage.
+
+    Args:
+        tagType: A `(tag_id, type)` pair from `Tag`.
+        value: Tag payload; encoding depends on `tagType`.
+
+    Returns:
+        None
+    """
+
     def __init__(self, tagType=Tag.Invalid, value=[]):
+        """Create a tag and encode its value payload.
+
+        Args:
+            tagType: A `(tag_id, type)` pair from `Tag`.
+            value: Tag payload; encoding depends on `tagType`.
+
+        Returns:
+            None
+        """
         self.Type = tagType
         self.TagId = tagType[0]
         self.DataType = tagType[1]
@@ -199,6 +277,14 @@ class dngTag(object):
             self.selfContained = False
 
     def setValue(self, value):
+        """Encode a Python value into the on-disk byte representation.
+
+        Args:
+            value: Tag value to encode.
+
+        Returns:
+            None
+        """
         if self.DataType == Type.Byte:
             self.Value = struct.pack("<%sB" % len(value), *value)
         elif self.DataType == Type.Short:
@@ -240,6 +326,16 @@ class dngTag(object):
         )
 
     def setBuffer(self, buf, tagOffset, dataOffset):
+        """Attach this tag to a shared output buffer.
+
+        Args:
+            buf: Mutable output buffer (e.g. `bytearray`).
+            tagOffset: Offset where the 12-byte tag entry will be written.
+            dataOffset: Offset where out-of-line data will be written.
+
+        Returns:
+            None
+        """
         self.buf = buf
         self.TagOffset = tagOffset
         self.DataOffset = dataOffset
@@ -247,6 +343,14 @@ class dngTag(object):
             self.subIFD.setBuffer(buf, self.DataOffset)
 
     def dataLen(self):
+        """Compute the number of bytes required for this tag's out-of-line data.
+
+        Args:
+            None
+
+        Returns:
+            Number of bytes needed to store the value payload (aligned to 4 bytes).
+        """
         if self.subIFD:
             return self.subIFD.dataLen()
         if self.selfContained:
@@ -255,6 +359,14 @@ class dngTag(object):
             return (len(self.Value) + 3) & 0xFFFFFFFC
 
     def write(self):
+        """Write the encoded tag entry (and payload, if needed) into the buffer.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         if not self.buf:
             raise RuntimeError("buffer not initialized")
 
@@ -285,11 +397,30 @@ class dngTag(object):
 
 
 class dngIFD(object):
+    """Image File Directory (IFD) containing a set of `dngTag` entries."""
+
     def __init__(self):
+        """Create an empty IFD.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         self.tags = []
         self.NextIFDOffset = 0
 
     def setBuffer(self, buf, offset):
+        """Attach the IFD and all its tags to a shared output buffer.
+
+        Args:
+            buf: Mutable output buffer (e.g. `bytearray`).
+            offset: Offset where the IFD begins.
+
+        Returns:
+            None
+        """
         self.buf = buf
         self.offset = offset
         currentDataOffset = offset + 2 + len(self.tags) * 12 + 4
@@ -301,12 +432,28 @@ class dngIFD(object):
             # currentDataOffset = (currentDataOffset + 3) & 0xFFFFFFFC
 
     def dataLen(self):
+        """Compute the encoded size of this IFD (including tag payloads).
+
+        Args:
+            None
+
+        Returns:
+            Total encoded length in bytes (aligned to 4 bytes).
+        """
         totalLength = 2 + len(self.tags) * 12 + 4
         for tag in sorted(self.tags, key=lambda x: x.TagId):
             totalLength += tag.dataLen()
         return (totalLength + 3) & 0xFFFFFFFC
 
     def write(self):
+        """Write the IFD and its tags into the buffer.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         if not self.buf:
             raise RuntimeError("buffer not initialized")
 
@@ -321,12 +468,30 @@ class dngIFD(object):
 
 
 class DNG(object):
+    """DNG container writer that assembles IFDs and image strips."""
+
     def __init__(self):
+        """Create an empty DNG container builder.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         self.IFDs = []
         self.ImageDataStrips = []
         self.StripOffsets = {}
 
     def setBuffer(self, buf):
+        """Attach a shared output buffer and assign offsets for each IFD.
+
+        Args:
+            buf: Mutable output buffer (e.g. `bytearray`).
+
+        Returns:
+            None
+        """
         self.buf = buf
 
         currentOffset = 8
@@ -336,6 +501,14 @@ class DNG(object):
             currentOffset += ifd.dataLen()
 
     def dataLen(self):
+        """Compute the total encoded size of the DNG file.
+
+        Args:
+            None
+
+        Returns:
+            Total encoded length in bytes (aligned to 4 bytes).
+        """
         totalLength = 8
         for ifd in self.IFDs:
             totalLength += (ifd.dataLen() + 3) & 0xFFFFFFFC
@@ -348,6 +521,14 @@ class DNG(object):
         return (totalLength + 3) & 0xFFFFFFFC
 
     def write(self, file: BinaryIO = None):
+        """Write the DNG to the attached buffer and optionally stream strips to a file.
+
+        Args:
+            file: Optional writable binary file-like object to stream image strips into.
+
+        Returns:
+            None
+        """
         struct.pack_into(
             "<ccbbI", self.buf, 0, b"I", b"I", 0x2A, 0x00, 8
         )  # assume the first IFD happens immediately after header
